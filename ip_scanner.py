@@ -1,5 +1,5 @@
 import socket
-import util
+from util import minecraft_util
 import random
 
 def getServerInfo(sock: socket.socket, addr: str, port: int):
@@ -10,8 +10,8 @@ def getServerInfo(sock: socket.socket, addr: str, port: int):
     try:
 
         # Ask for Server List
-        util.serverListPing(sock, addr, port)
-        util.statusRequest(sock)
+        minecraft_util.serverListPing(sock, addr, port)
+        minecraft_util.statusRequest(sock)
 
         # Get bytes until we stop receiving
         while True:
@@ -22,7 +22,7 @@ def getServerInfo(sock: socket.socket, addr: str, port: int):
 
     # Decode if we got a response
     if buffer != b'':
-        jsonInfo = util.decodeStatusResponse(buffer)
+        jsonInfo = minecraft_util.decodeStatusResponse(buffer)
 
     return jsonInfo
 
@@ -34,11 +34,11 @@ def scanIp(addr: str):
     try:
 
         # Connect to Server
-        sock.connect((addr, util.DEFAULT_PORT))
+        sock.connect((addr, minecraft_util.DEFAULT_PORT))
         print(f"{addr} open port")
 
         # Try to get Server Info
-        svInfo = getServerInfo(sock, addr, util.DEFAULT_PORT)
+        svInfo = getServerInfo(sock, addr, minecraft_util.DEFAULT_PORT)
 
         if svInfo != None:
             print(addr + " | " + str(svInfo["version"]["name"]) + " | " + str(svInfo["players"]))
