@@ -6,14 +6,10 @@ from io import TextIOWrapper
 from threading import Lock, Thread
 from random import shuffle
 from queue import Queue
-from util import minecraft_util
+
+from util import minecraft_util, scanning_util
 
 rangeQueue = Queue()
-
-def writeServerToFile(ip: str, jsonObj, file: TextIOWrapper, fileLock: Lock):
-    fileLock.acquire()
-    file.write(ip + " | " + str(jsonObj["version"]["name"]) + " | " + str(jsonObj["players"]) + "\n")
-    fileLock.release()
 
 
 def getServerInfo(sock: socket.socket, addr: str, port: int):
@@ -54,7 +50,7 @@ def scanIp(ip: str, file: TextIOWrapper, fileLock: Lock) -> None:
         svInfo = getServerInfo(sock, ip, minecraft_util.DEFAULT_PORT)
 
         if svInfo != None:
-            writeServerToFile(ip, svInfo, file, fileLock)
+            scanning_util.writeServerToFile(ip, svInfo, file, fileLock)
 
             print("")
             print(ip + " | " + str(svInfo["version"]["name"]) + " | " + str(svInfo["players"]))
