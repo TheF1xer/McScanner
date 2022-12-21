@@ -34,15 +34,18 @@ def scanSock(timedSock: scanning_util.TimedSocket, outputFile: TextIOWrapper, fi
         except:
             pass
 
-    if buffer != b'':
-        serverInfoJson = minecraft_util.decodeStatusResponse(buffer)
 
+    # Decode Server List Packet
     try:
+        if buffer != b'':
+            serverInfoJson = minecraft_util.decodeStatusResponse(buffer)
+
         scanning_util.writeServerToFile(timedSock.ip, serverInfoJson, outputFile, fileLock)
 
         print("")
         print(timedSock.ip + " | " + str(serverInfoJson["version"]["name"]) + " | " + str(serverInfoJson["players"]))
         print("")
+
     except:
         print("An error ocurred: " + timedSock.ip)
 
@@ -77,7 +80,6 @@ def addSocketsToQueue(maxSocks: int) -> None:
 
     while not rangeQueue.empty():
         ipRange: tuple = rangeQueue.get()
-        #print(f"Scanning: {ipRange[0]}.{ipRange[1]}.0.0")
 
         for X in range(256):
             print(f"Scanning: {ipRange[0]}.{ipRange[1]}.{X}.0")
@@ -130,9 +132,6 @@ if __name__ == "__main__":
             t.daemon = True
             t.start()
     
-        sockQueue.put(scanning_util.TimedSocket("185.57.8.28", minecraft_util.DEFAULT_PORT))
-        sockQueue.put(scanning_util.TimedSocket("mc.hypixel.net", minecraft_util.DEFAULT_PORT))
-
         # Main Thread
         addSocketsToQueue(MAX_SOCKS)
         
