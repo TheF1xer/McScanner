@@ -80,9 +80,9 @@ def addSocketsToQueue(maxSocks: int) -> None:
 
     while not rangeQueue.empty():
         ipRange: tuple = rangeQueue.get()
+        print(f"Scanning: {ipRange[0]}.{ipRange[1]}.0.0")
 
         for X in range(256):
-            print(f"Scanning: {ipRange[0]}.{ipRange[1]}.{X}.0")
             for Y in range(256):
                 while sockQueue.qsize() > maxSocks:
                     pass
