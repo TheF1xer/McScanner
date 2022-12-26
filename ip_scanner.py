@@ -28,26 +28,22 @@ def scanSock(timedSock: scanning_util.TimedSocket, outputFile: TextIOWrapper, fi
     # Receive Server list
     timedSock.restartTimer()
 
-    while timedSock.getTimePassedSeconds() < SOCKET_TIMEOUT_SECS:
+    while timedSock.getTimePassedSeconds() < 10:         # We want to give the socket enough time
         try:
             buffer += timedSock.sock.recv(4096)
         except:
             pass
 
+    if buffer == b'':
+        return
 
     # Decode Server List Packet
     try:
-        if buffer != b'':
-            serverInfoJson = minecraft_util.decodeStatusResponse(buffer)
-
-        scanning_util.writeServerToFile(timedSock.ip, serverInfoJson, outputFile, fileLock)
-
-        print("")
-        print(timedSock.ip + " | " + str(serverInfoJson["version"]["name"]) + " | " + str(serverInfoJson["players"]))
-        print("")
-
+        serverInfoJson = minecraft_util.decodeStatusResponse(buffer)
     except:
-        print("An error ocurred: " + timedSock.ip)
+        return
+
+    scanning_util.writeServerToFileLock(timedSock.ip, serverInfoJson, outputFile, fileLock)
 
 
 def checkSocketsThread(outputFile: TextIOWrapper, fileLock: Lock) -> None:
@@ -83,6 +79,7 @@ def addSocketsToQueue(maxSocks: int) -> None:
         print(f"Scanning: {ipRange[0]}.{ipRange[1]}.0.0")
 
         for X in range(256):
+            #print(f"Scanning: {ipRange[0]}.{ipRange[1]}.{X}.0")
             for Y in range(256):
                 while sockQueue.qsize() > maxSocks:
                     pass

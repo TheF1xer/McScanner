@@ -4,9 +4,18 @@ from io import TextIOWrapper
 from threading import Lock
 
 
-def writeServerToFile(ip: str, jsonObj: dict, file: TextIOWrapper, fileLock: Lock):
+def writeServerToFileLock(ip: str, jsonObj: dict, file: TextIOWrapper, fileLock: Lock):
     fileLock.acquire()
-    file.write(ip + " | " + str(jsonObj["version"]["name"]) + " | " + str(jsonObj["players"]) + "\n")
+
+    try:
+        file.write(ip + " | " + str(jsonObj["version"]["name"]) + " | " + str(jsonObj["players"]) + "\n")
+
+        print("")
+        print(ip + " | " + str(jsonObj["version"]["name"]) + " | " + str(jsonObj["players"]))
+        print("")
+    except:
+        pass
+
     fileLock.release()
 
 
