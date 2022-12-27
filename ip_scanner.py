@@ -15,6 +15,12 @@ SOCKET_TIMEOUT_SECS = 0.6
 
 
 def scanSock(timedSock: scanning_util.TimedSocket, outputFile: TextIOWrapper, fileLock: Lock) -> None:
+
+    """
+    Ask a succesfully connected socket for the Server List and then try
+    to process it
+    """
+
     serverInfoJson: dict = {}
     buffer = b''
 
@@ -35,7 +41,7 @@ def scanSock(timedSock: scanning_util.TimedSocket, outputFile: TextIOWrapper, fi
             pass
 
     if buffer == b'':
-        return
+        return                                          # Return if no information was received
 
     # Decode Server List Packet
     try:
@@ -43,11 +49,15 @@ def scanSock(timedSock: scanning_util.TimedSocket, outputFile: TextIOWrapper, fi
     except:
         return
 
+    # Write Server List info to file
     scanning_util.writeServerToFileLock(timedSock.ip, serverInfoJson, outputFile, fileLock)
 
 
 def checkSocketsThread(outputFile: TextIOWrapper, fileLock: Lock) -> None:
+
     """
+    Will check the sockets and if one is connected, it will ask for the Server List
+    If a socket times out, it will be removed
     I don't like the implementations but it is what it is
     """
 
@@ -68,7 +78,8 @@ def checkSocketsThread(outputFile: TextIOWrapper, fileLock: Lock) -> None:
             sockQueue.put(timedSock)
 
 
-def addSocketsToQueue(maxSocks: int) -> None:
+def addSocketsToQueue(maxSocks: int, scannedIpsFile: TextIOWrapper) -> None:
+
     """
     Creates sockets, tries to connect them to an ip and
     adds them to the queue
@@ -79,7 +90,7 @@ def addSocketsToQueue(maxSocks: int) -> None:
         print(f"Scanning: {ipRange[0]}.{ipRange[1]}.0.0")
 
         for X in range(256):
-            #print(f"Scanning: {ipRange[0]}.{ipRange[1]}.{X}.0")
+
             for Y in range(256):
                 while sockQueue.qsize() > maxSocks:
                     pass
@@ -88,19 +99,22 @@ def addSocketsToQueue(maxSocks: int) -> None:
                 timedSock = scanning_util.TimedSocket(ip, minecraft_util.DEFAULT_PORT)
                 sockQueue.put(timedSock)
 
+        scannedIpsFile.write(f"{ipRange[0]}.{ipRange[1]}.0.0\n")        # Add them to the file so that the range wont be checked again
+
 
 if __name__ == "__main__":
 
-    THREAD_NUM = int(sys.argv[1])
-    MAX_SOCKS = int(sys.argv[2])
+    THREAD_NUM = int(sys.argv[1])       # Number of threads that will be created
+    MAX_SOCKS = int(sys.argv[2])        # Max number of sockets at the same time
 
     sockQueue = Queue()
 
     # Save scan results to new file
-    if not os.path.exists("scans"):
-        os.mkdir("scans")
+    os.makedirs("results", exist_ok=True)
+    os.makedirs("results/scans", exist_ok=True)
 
-    fileName = f"scans/{time.strftime('%Y%m%d-%H%M%S')}.txt"
+    fileName = f"results/scans/{time.strftime('%Y%m%d-%H%M%S')}.txt"
+    scannedIpsName = f"results/scanned_ips.txt"
 
 
     print("")
@@ -113,22 +127,42 @@ if __name__ == "__main__":
     print("-----------------------------------------------")
     print("")
 
-    with open(fileName, "w") as outputFile:
-        fileLock = Lock()
 
-        # Build range queue
+    # This is where the fun starts
+    with open(fileName, "w") as outputFile, open(scannedIpsName, "a+") as scannedIpsFile:
+        fileLock = Lock()
+        scannedIps = scanning_util.getScannedIps(scannedIpsFile)
+
+        """
+        This is where the Range Queue is filed with ips that have not been scanned.
+        The ip ranges that have been scanned are stored in the scannedIpsFile
+        """
+
         for A in range(256):
             for B in range(256):
+
+                # Check if range has already been scanned
+                if scanning_util.rangeAlreadyScanned(scannedIps, f"{A}.{B}.0.0"):
+                    continue
+
                 rangeQueue.put((A, B))
     
-        shuffle(rangeQueue.queue)
+        shuffle(rangeQueue.queue)       # Shuffling is more fun
 
-        # Threads
+        """
+        Threads are build and started. The threads will check the sockets and try to get
+        the Server List
+        """
+
         for i in range(THREAD_NUM):
             t = Thread(target=checkSocketsThread, args=(outputFile, fileLock))
             t.daemon = True
             t.start()
     
-        # Main Thread
-        addSocketsToQueue(MAX_SOCKS)
+        """
+        The main thread will create the sockets and connect them to "random" ips, if they
+        are succesfully connected, the connection will be checked by the threads
+        """
+
+        addSocketsToQueue(MAX_SOCKS, scannedIpsFile)
         

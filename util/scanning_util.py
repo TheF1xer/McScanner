@@ -8,15 +8,27 @@ def writeServerToFileLock(ip: str, jsonObj: dict, file: TextIOWrapper, fileLock:
     fileLock.acquire()
 
     try:
-        file.write(ip + " | " + str(jsonObj["version"]["name"]) + " | " + str(jsonObj["players"]) + "\n")
+        file.write(ip + " | " +  str(jsonObj["version"]["name"]) + " | " + str(jsonObj["players"]) + "\n")
 
         print("")
-        print(ip + " | " + str(jsonObj["version"]["name"]) + " | " + str(jsonObj["players"]))
+        print(ip)
+        print(str(jsonObj["version"]["name"]))
+        print(str(jsonObj["players"]))
         print("")
+
     except:
         pass
 
     fileLock.release()
+
+
+def getScannedIps(file: TextIOWrapper) -> list:
+    file.seek(0)
+    return file.read().splitlines()
+
+
+def rangeAlreadyScanned(scannedIps: list, ipRange: str) -> bool:
+    return scannedIps.count(ipRange) > 0
 
 
 class TimedSocket:
