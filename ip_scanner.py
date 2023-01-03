@@ -1,6 +1,6 @@
 from io import TextIOWrapper
 import os
-import sys
+import argparse
 import time
 from threading import Lock, Thread
 from queue import Queue
@@ -10,8 +10,11 @@ from util import minecraft_util, scanning_util
 
 
 rangeQueue: Queue = Queue()
-sockQueue: Queue
+sockQueue: Queue = Queue()
+
 SOCKET_TIMEOUT_SECS = 0.6
+DEFAULT_THREADS = 3
+DEFAULT_SOCKETS = 256
 
 
 def scanSock(timedSock: scanning_util.TimedSocket, outputFile: TextIOWrapper, fileLock: Lock) -> None:
@@ -34,7 +37,7 @@ def scanSock(timedSock: scanning_util.TimedSocket, outputFile: TextIOWrapper, fi
     # Receive Server list
     timedSock.restartTimer()
 
-    while timedSock.getTimePassedSeconds() < 10:         # We want to give the socket enough time
+    while timedSock.getTimePassedSeconds() < 7:         # We want to give the socket enough time
         try:
             buffer += timedSock.sock.recv(4096)
         except:
@@ -47,6 +50,9 @@ def scanSock(timedSock: scanning_util.TimedSocket, outputFile: TextIOWrapper, fi
     try:
         serverInfoJson = minecraft_util.decodeStatusResponse(buffer)
     except:
+        print("")
+        print(timedSock.ip + " : Error decoding the packet")
+        print("")
         return
 
     # Write Server List info to file
@@ -102,12 +108,59 @@ def addSocketsToQueue(maxSocks: int, scannedIpsFile: TextIOWrapper) -> None:
         scannedIpsFile.write(f"{ipRange[0]}.{ipRange[1]}.0.0\n")        # Add them to the file so that the range wont be checked again
 
 
+def buildRangeQueue(fileName: str, scannedIps: list) -> None:
+
+    """
+    If no file is provided, we want to scan the whole internet
+    If a file was provided, we only scan the ranges included in the file
+    Always check if the range was already scanned
+    """
+
+    # No file provided
+    if fileName == None:
+
+        # Scan the whole internet
+        for A in range(256):
+            for B in range(256):
+
+                # Check if range has already been scanned
+                if scanning_util.rangeAlreadyScanned(scannedIps, f"{A}.{B}.0.0"):
+                    continue
+
+                rangeQueue.put((A, B))
+        return
+    
+    # Ips-to-scan file provided
+    with open(fileName, "r") as file:
+        ipsToScan = file.read().splitlines()
+        for ip in ipsToScan:
+
+            if scanning_util.rangeAlreadyScanned(scannedIps, ip):
+                continue
+
+            ipSplit = ip.split(".")
+            rangeQueue.put((ipSplit[0], ipSplit[1]))
+
+
+def parseArguments(parser: argparse.ArgumentParser) -> argparse.Namespace:
+    parser.add_argument("-t", "--threads",
+                        type=int, default=DEFAULT_THREADS,
+                        help="Number of Threads to be used to scan the sockets")
+
+    parser.add_argument("-s", "--sockets",
+                        type=int, default=DEFAULT_SOCKETS,
+                        help="Number of sockets to be used to scan the internet")
+
+    parser.add_argument("-i", "--ips",
+                        help="File that contains ip ranges to scan (if no file is provided, it will scan the whole internet)")
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
 
-    THREAD_NUM = int(sys.argv[1])       # Number of threads that will be created
-    MAX_SOCKS = int(sys.argv[2])        # Max number of sockets at the same time
-
-    sockQueue = Queue()
+    parser = argparse.ArgumentParser()
+    args = parseArguments(parser)
 
     # Save scan results to new file
     os.makedirs("results", exist_ok=True)
@@ -122,8 +175,8 @@ if __name__ == "__main__":
     print("TheF1xer's Minecraft Server Scanner")
     print("Saving results to file: " + fileName)
     print("")
-    print("Using " + str(THREAD_NUM) + " threads")
-    print("and " + str(MAX_SOCKS) + " non-blocking sockets")
+    print("Using " + str(args.sockets) + " threads")
+    print("and " + str(args.threads) + " non-blocking sockets")
     print("-----------------------------------------------")
     print("")
 
@@ -138,14 +191,7 @@ if __name__ == "__main__":
         The ip ranges that have been scanned are stored in the scannedIpsFile
         """
 
-        for A in range(256):
-            for B in range(256):
-
-                # Check if range has already been scanned
-                if scanning_util.rangeAlreadyScanned(scannedIps, f"{A}.{B}.0.0"):
-                    continue
-
-                rangeQueue.put((A, B))
+        buildRangeQueue(args.ips, scannedIps)
     
         shuffle(rangeQueue.queue)       # Shuffling is more fun
 
@@ -154,7 +200,7 @@ if __name__ == "__main__":
         the Server List
         """
 
-        for i in range(THREAD_NUM):
+        for i in range(args.threads):
             t = Thread(target=checkSocketsThread, args=(outputFile, fileLock))
             t.daemon = True
             t.start()
@@ -164,5 +210,5 @@ if __name__ == "__main__":
         are succesfully connected, the connection will be checked by the threads
         """
 
-        addSocketsToQueue(MAX_SOCKS, scannedIpsFile)
+        addSocketsToQueue(args.sockets, scannedIpsFile)
         
